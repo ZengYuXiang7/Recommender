@@ -5,12 +5,12 @@ ulimit -a
 # 定义变量
 experiment=1
 run_name='Experiment'
-rounds=1 epochs=150 patience=30 device='cpu'
+rounds=1 epochs=150 patience=30 device='mps'
 batch_size=1024
 record=1 program_test=0 verbose=1 classification=0
 dimensions="40"
 datasets="cpu"
-densities="0.02"
+densities="0.80"
 py_files="train_model"
 models="neucf"
 

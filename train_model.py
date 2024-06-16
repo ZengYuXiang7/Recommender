@@ -85,8 +85,31 @@ class Model(torch.nn.Module):
         if mode == 'valid':
             self.scheduler.step(val_loss)
         metrics_error = ErrorMetrics(reals * dataModule.max_value, preds * dataModule.max_value, self.args)
+
+        # recall = recall_at_k(reals * dataModule.max_value, preds * dataModule.max_value, 10)
+        # ndcg = ndcg_at_k(reals * dataModule.max_value, preds * dataModule.max_value, 10)
+        # print(recall, ndcg)
         return metrics_error
 
+def recall_at_k(reals, preds, k=10):
+    recalls = []
+    for real, pred in zip(reals, preds):
+        top_k_preds = np.argsort(pred)[::-1][:k]
+        hits = len(set(top_k_preds) & set(real))
+        recalls.append(hits / len(real))
+    return np.mean(recalls)
+
+def ndcg_at_k(reals, preds, k=10):
+    ndcgs = []
+    for real, pred in zip(reals, preds):
+        top_k_preds = np.argsort(pred)[::-1][:k]
+        dcg = 0
+        idcg = sum([1.0 / np.log2(i + 2) for i in range(min(len(real), k))])
+        for i, p in enumerate(top_k_preds):
+            if p in real:
+                dcg += 1.0 / np.log2(i + 2)
+        ndcgs.append(dcg / idcg)
+    return np.mean(ndcgs)
 
 
 def RunOnce(args, runId, log):
@@ -162,7 +185,7 @@ if __name__ == '__main__':
     set_settings(args)
 
     # logger plotter
-    exper_detail = f"Dataset : {args.dataset.upper()}, Model : {args.model}, Density : {args.density}"
+    exper_detail = f"Dataset : {args.dataset.upper()}, Model : {args.model.upper()}, Density : {args.density}"
     log_filename = f'r{args.dimension}'
     log = Logger(log_filename, exper_detail, args)
     plotter = MetricsPlotter(log_filename, args)

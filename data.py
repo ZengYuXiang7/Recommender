@@ -25,7 +25,7 @@ class experiment:
         import pandas as pd
 
         # 读取评分数据
-        ratings = pd.read_csv("datasets/ml-25m/ratings.csv")
+        ratings = pd.read_csv("datasets/ml-25m/ratings.csv").astype("float32")
 
         # 将电影ID和用户ID转换为连续索引
         user_ids = ratings['userId'].unique()
@@ -41,8 +41,7 @@ class experiment:
         num_users = len(user_ids)
         num_movies = len(movie_ids)
 
-        interaction_matrix = csr_matrix((ratings['rating'], (ratings['userId'], ratings['movieId'])),
-                                        shape=(num_users, num_movies))
+        interaction_matrix = csr_matrix((ratings['rating'], (ratings['userId'], ratings['movieId'])), shape=(num_users, num_movies))
 
         print("Interaction matrix shape:", interaction_matrix.shape)
 
