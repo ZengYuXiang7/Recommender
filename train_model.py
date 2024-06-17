@@ -10,6 +10,7 @@ import torch
 from tqdm import *
 
 from data import experiment, DataModule
+from modules.MF import MF
 
 from modules.NeuCF import NeuCF
 from utils.config import get_config
@@ -32,6 +33,9 @@ class Model(torch.nn.Module):
         self.hidden_size = args.dimension
         if args.model == 'neucf':
             self.model = NeuCF(args)
+
+        elif args.model == 'mf':
+            self.model = MF(args)
 
         else:
             raise ValueError(f"Unsupported model type: {args.model}")
