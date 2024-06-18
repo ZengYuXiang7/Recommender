@@ -30,7 +30,7 @@ class Model(torch.nn.Module):
         super().__init__()
         self.args = args
         self.input_size = data.x.shape[-1]
-        self.hidden_size = args.dimension
+        self.hidden_size = args.rank
         if args.model == 'neucf':
             self.model = NeuCF(args)
 
@@ -190,7 +190,7 @@ if __name__ == '__main__':
 
     # logger plotter
     exper_detail = f"Dataset : {args.dataset.upper()}, Model : {args.model.upper()}, Density : {args.density}"
-    log_filename = f'r{args.dimension}'
+    log_filename = f'r{args.rank}'
     log = Logger(log_filename, exper_detail, args)
     plotter = MetricsPlotter(log_filename, args)
     args.log = log

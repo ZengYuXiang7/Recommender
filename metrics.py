@@ -1,3 +1,5 @@
+import heapq
+
 import numpy as np
 from sklearn.metrics import roc_auc_score
 
@@ -92,9 +94,152 @@ def F1(pre, rec):
     else:
         return 0.
 
-def auc(ground_truth, prediction):
+def AUC(ground_truth, prediction):
     try:
         res = roc_auc_score(y_true=ground_truth, y_score=prediction)
     except Exception:
         res = 0.
     return res
+
+
+def ranklist_by_heapq(user_pos_test, test_items, rating, Ks):
+    item_score = {}
+    for i in test_items:
+        item_score[i] = rating[i]
+
+    K_max = max(Ks)
+    K_max_item_score = heapq.nlargest(K_max, item_score, key=item_score.get)
+
+    r = []
+    for i in K_max_item_score:
+        if i in user_pos_test:
+            r.append(1)
+        else:
+            r.append(0)
+    auc = 0.
+    return r, auc
+
+def get_auc(item_score, user_pos_test):
+    item_score = sorted(item_score.items(), key=lambda kv: kv[1])
+    item_score.reverse()
+    item_sort = [x[0] for x in item_score]
+    posterior = [x[1] for x in item_score]
+
+    r = []
+    for i in item_sort:
+        if i in user_pos_test:
+            r.append(1)
+        else:
+            r.append(0)
+    auc = AUC(ground_truth=r, prediction=posterior)
+    return auc
+
+def ranklist_by_sorted(user_pos_test, test_items, rating, Ks):
+    item_score = {}
+    for i in test_items:
+        item_score[i] = rating[i]
+
+    K_max = max(Ks)
+    K_max_item_score = heapq.nlargest(K_max, item_score, key=item_score.get)
+
+    r = []
+    for i in K_max_item_score:
+        if i in user_pos_test:
+            r.append(1)
+        else:
+            r.append(0)
+    auc = get_auc(item_score, user_pos_test)
+    return r, auc
+
+
+def get_performance(user_pos_test, r, auc, Ks):
+    precision, recall, ndcg, hit_ratio = [], [], [], []
+
+    for K in Ks:
+        precision.append(precision_at_k(r, K))
+        recall.append(recall_at_k(r, K, len(user_pos_test)))
+        ndcg.append(ndcg_at_k(r, K))
+        hit_ratio.append(hit_at_k(r, K))
+
+    return {'recall': np.array(recall), 'precision': np.array(precision),
+            'ndcg': np.array(ndcg), 'hit_ratio': np.array(hit_ratio), 'auc': auc}
+
+
+
+def test_one_user(rating, u, is_val):
+    #user u's items in the training set
+    try:
+        training_items = train_items[u]
+    except Exception:
+        training_items = []
+    #user u's items in the test set
+    if is_val:
+        user_pos_test = val_set[u]
+    else:
+        user_pos_test = test_set[u]
+
+    all_items = set(range(ITEM_NUM))
+    test_items = list(all_items - set(training_items))
+    r, auc = ranklist_by_sorted(user_pos_test, test_items, rating, Ks)
+    return get_performance(user_pos_test, r, auc, Ks)
+
+
+
+
+if __name__ == '__main__':
+    import numpy as np
+    import torch
+    import multiprocessing
+
+    # Constants
+    BATCH_SIZE = 10
+    ITEM_NUM = 500
+    Ks = [5, 10, 20]
+
+    # Generate random embeddings for users and items
+    np.random.seed(42)
+    torch.manual_seed(42)
+
+    user_embedding_dim = 64
+    item_embedding_dim = 64
+    num_users = 100
+    num_items = 500
+
+    ua_embeddings = torch.randn(num_users, user_embedding_dim)
+    ia_embeddings = torch.randn(num_items, item_embedding_dim)
+
+    # List of users to test
+    users_to_test = np.random.choice(num_users, size=20, replace=False)
+
+    # Flags
+    is_val = True
+    drop_flag = False
+    batch_test_flag = True
+
+    print(users_to_test)
+    result = {'precision': np.zeros(len(Ks)), 'recall': np.zeros(len(Ks)), 'ndcg': np.zeros(len(Ks)), 'hit_ratio': np.zeros(len(Ks)), 'auc': 0.}
+
+    BATCH_SIZE = 32
+    u_batch_size = BATCH_SIZE * 2
+    i_batch_size = BATCH_SIZE
+
+    n_test_users = len(users_to_test)
+    n_user_batchs = n_test_users // u_batch_size + 1
+    count = 0
+
+    test_users = users_to_test
+
+    for u_batch_id in range(n_user_batchs):
+        start = u_batch_id * u_batch_size
+        end = (u_batch_id + 1) * u_batch_size
+        user_batch = test_users[start: end]
+        print(user_batch)
+
+        item_batch = range(ITEM_NUM)
+        u_g_embeddings = ua_embeddings[user_batch]
+        i_g_embeddings = ia_embeddings[item_batch]
+        rate_batch = torch.matmul(u_g_embeddings, torch.transpose(i_g_embeddings, 0, 1))
+        rate_batch = rate_batch.detach().cpu().numpy()
+        print(rate_batch.shape)
+
+        results = test_one_user(rate_batch, user_batch, [True] * len(user_batch))
